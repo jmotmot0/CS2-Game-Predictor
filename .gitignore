@@ -1,22 +1,28 @@
-
-__pycache__/
-*.py[cod]
-*.pyo
-
+# Python
 .venv/
-venv/
+__pycache__/
+*.pyc
 
-.ipynb_checkpoints/
-
+# IDE
 .idea/
+.vscode/
 
-.DS_Store
-Thumbs.db
+# Data
+data/raw/
+data/interim/
+data/processed/
 
-data/raw/*
-data/interim/*
-data/processed/*
+# Browser / scraping profiles
+data/browser_profile/
+data/chrome_cdp_profile/
+data/edge_cdp_profile/
 
-!data/raw/.gitkeep
-!data/interim/.gitkeep
-!data/processed/.gitkeep
+# Models / artifacts
+models/
+artifacts/
+*.pkl
+*.joblib
+*.cbm
+
+# Logs
+*.log
