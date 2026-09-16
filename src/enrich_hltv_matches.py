@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import random
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 from bs4 import BeautifulSoup, NavigableString
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from src.hltv_browser import BrowserActionRequired, BrowserFetcher
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -52,6 +54,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", type=str, default=str(OUT_DIR_DEFAULT))
     parser.add_argument("--limit-matches", type=int, default=50)
     parser.add_argument("--start-offset", type=int, default=0)
+    parser.add_argument("--manual-wait-seconds", type=int, default=180)
+    parser.add_argument("--sleep-min", type=float, default=1.5)
+    parser.add_argument("--sleep-max", type=float, default=3.5)
     parser.add_argument(
         "--checkpoint-every",
         type=int,
@@ -127,100 +132,6 @@ def parse_opkd(text: str) -> tuple[int | None, int | None]:
     if match:
         return int(match.group(1)), int(match.group(2))
     return None, None
-
-
-class BrowserFetcher:
-    def __init__(self, profile_dir: str, cdp_url: str = "") -> None:
-        self.profile_dir = profile_dir
-        self.cdp_url = safe_str(cdp_url)
-        self.playwright = None
-        self.browser = None
-        self.context = None
-        self.page = None
-        self.owns_context = False
-
-    def __enter__(self) -> "BrowserFetcher":
-        Path(self.profile_dir).mkdir(parents=True, exist_ok=True)
-        self.playwright = sync_playwright().start()
-
-        if self.cdp_url:
-            self.browser = self.playwright.chromium.connect_over_cdp(self.cdp_url)
-            if not self.browser.contexts:
-                raise RuntimeError(f"No browser context is available at CDP URL {self.cdp_url}")
-            self.context = self.browser.contexts[0]
-        else:
-            self.owns_context = True
-            try:
-                self.context = self.playwright.chromium.launch_persistent_context(
-                    user_data_dir=self.profile_dir,
-                    channel="chrome",
-                    headless=False,
-                    viewport={"width": 1440, "height": 1000},
-                    args=[
-                        "--disable-blink-features=AutomationControlled",
-                        "--start-maximized",
-                    ],
-                )
-            except Exception:
-                self.context = self.playwright.chromium.launch_persistent_context(
-                    user_data_dir=self.profile_dir,
-                    headless=False,
-                    viewport={"width": 1440, "height": 1000},
-                    args=[
-                        "--disable-blink-features=AutomationControlled",
-                        "--start-maximized",
-                    ],
-                )
-
-        assert self.context is not None
-        if self.context.pages:
-            self.page = self.context.pages[0]
-        else:
-            self.page = self.context.new_page()
-
-        self.page.set_extra_http_headers(
-            {
-                "Accept-Language": "en-US,en;q=0.9",
-                "Cache-Control": "no-cache",
-                "Pragma": "no-cache",
-            }
-        )
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        try:
-            if self.owns_context and self.context is not None:
-                self.context.close()
-        finally:
-            if self.playwright is not None:
-                self.playwright.stop()
-
-    def get_html(
-        self,
-        url: str,
-        ready_selector: str,
-        referer: str | None = None,
-        timeout_ms: int = 45000,
-    ) -> str:
-        assert self.page is not None
-
-        self.page.goto(
-            url,
-            wait_until="domcontentloaded",
-            referer=referer,
-            timeout=timeout_ms,
-        )
-
-        try:
-            self.page.wait_for_selector(ready_selector, timeout=12000)
-        except PlaywrightTimeoutError:
-            print("\n[manual action]")
-            print(f"Open in the shown browser window: {url}")
-            print("If Cloudflare appears, complete it manually in the browser.")
-            input("When the page is fully open, press Enter here... ")
-            self.page.wait_for_selector(ready_selector, timeout=120000)
-
-        return self.page.content()
 
 
 def parse_match_meta(soup: BeautifulSoup, raw_row: dict[str, Any]) -> dict[str, Any]:
@@ -764,6 +675,10 @@ def main() -> None:
         raise ValueError("--limit-matches must be non-negative")
     if args.checkpoint_every < 0:
         raise ValueError("--checkpoint-every must be non-negative")
+    if args.manual_wait_seconds < 0:
+        raise ValueError("--manual-wait-seconds must be non-negative")
+    if args.sleep_min < 0 or args.sleep_max < args.sleep_min:
+        raise ValueError("Require 0 <= sleep-min <= sleep-max")
 
     input_path = Path(args.input)
     out_dir = Path(args.out_dir)
@@ -802,7 +717,11 @@ def main() -> None:
         raw = raw.iloc[: args.limit_matches].copy()
 
     try:
-        with BrowserFetcher(args.browser_profile_dir, args.cdp_url) as browser:
+        with BrowserFetcher(args.browser_profile_dir, args.cdp_url, args.manual_wait_seconds) as browser:
+            def fetch_page(**kwargs: Any) -> str:
+                time.sleep(random.uniform(args.sleep_min, args.sleep_max))
+                return browser.get_html(**kwargs)
+
             for i, raw_row in enumerate(raw.to_dict(orient="records"), start=1):
                 match_id = safe_str(raw_row.get("match_id"))
                 match_url = safe_str(raw_row.get("source_url"))
@@ -810,7 +729,7 @@ def main() -> None:
                 print(f"[{i}/{len(raw)}] match_id={match_id}")
 
                 try:
-                    match_html = browser.get_html(
+                    match_html = fetch_page(
                         url=match_url,
                         ready_selector=".team1-gradient .teamName",
                         referer="https://www.hltv.org/results",
@@ -842,7 +761,7 @@ def main() -> None:
                         else:
                             stats_url = f"https://www.hltv.org/stats/matches/mapstatsid/{int(mapstatsid)}/x"
 
-                        stats_html = browser.get_html(
+                        stats_html = fetch_page(
                             url=stats_url,
                             ready_selector=".stats-table.totalstats td.st-player, .totalstats td.st-player",
                             referer=match_url,
@@ -872,6 +791,9 @@ def main() -> None:
                     failure_rows = [
                         row for row in failure_rows if safe_str(row.get("match_id")) != match_id
                     ]
+                except BrowserActionRequired:
+                    # A challenge affects the batch, not just this one match.
+                    raise
                 except Exception as exc:
                     print(f"[skip] match_id={match_id} -> {exc}")
                     failure_rows = [
@@ -916,6 +838,11 @@ def main() -> None:
     print(f"match_maps.csv: {len(map_rows)} rows")
     print(f"map_player_stats.csv: {len(player_rows)} rows")
     print(f"failed_matches.csv: {len(failure_rows)} rows")
+    if failure_rows:
+        raise RuntimeError(
+            f"Enrichment is incomplete: {len(failure_rows)} unresolved failed matches. "
+            "Inspect failed_matches.csv and retry with --resume before cleaning or training."
+        )
 
 
 if __name__ == "__main__":
