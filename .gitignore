@@ -2,6 +2,9 @@
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+.coverage
+htmlcov/
 
 # IDE
 .idea/
@@ -23,6 +26,16 @@ artifacts/
 *.pkl
 *.joblib
 *.cbm
+
+# Local deliverables and temporary build products
+documents/
+tmp/
+.chart-data-*/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
 
 # Logs
 *.log

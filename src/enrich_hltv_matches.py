@@ -27,6 +27,15 @@ VETO_REMOVE_RE = re.compile(r"(\d+)\.\s+(.+?)\s+removed\s+(.+)")
 VETO_PICK_RE = re.compile(r"(\d+)\.\s+(.+?)\s+picked\s+(.+)")
 VETO_LEFTOVER_RE = re.compile(r"(\d+)\.\s+(.+?)\s+was left over")
 
+OUTPUT_FILENAMES = {
+    "matches": "matches_enriched.csv",
+    "lineups": "match_lineups.csv",
+    "vetoes": "veto_steps.csv",
+    "maps": "match_maps.csv",
+    "players": "map_player_stats.csv",
+    "failures": "failed_matches.csv",
+}
+
 
 def parse_args() -> argparse.Namespace:
 
@@ -36,13 +45,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--cdp-url",
         type=str,
-        default="http://127.0.0.1:9222",
-        help="CDP URL of a manually started Chrome.",
+        default="",
+        help="Optional CDP URL of a manually started Chrome; otherwise a persistent local profile is used.",
     )
     parser.add_argument("--input", type=str, default=str(RAW_DEFAULT))
     parser.add_argument("--out-dir", type=str, default=str(OUT_DIR_DEFAULT))
     parser.add_argument("--limit-matches", type=int, default=50)
     parser.add_argument("--start-offset", type=int, default=0)
+    parser.add_argument(
+        "--checkpoint-every",
+        type=int,
+        default=25,
+        help="Atomically save accumulated rows after this many attempted matches; 0 disables checkpoints.",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Continue an existing output batch and skip completed match IDs.",
+    )
     parser.add_argument(
         "--browser-profile-dir",
         type=str,
@@ -110,38 +130,49 @@ def parse_opkd(text: str) -> tuple[int | None, int | None]:
 
 
 class BrowserFetcher:
-    def __init__(self, profile_dir: str) -> None:
+    def __init__(self, profile_dir: str, cdp_url: str = "") -> None:
         self.profile_dir = profile_dir
+        self.cdp_url = safe_str(cdp_url)
         self.playwright = None
+        self.browser = None
         self.context = None
         self.page = None
+        self.owns_context = False
 
     def __enter__(self) -> "BrowserFetcher":
         Path(self.profile_dir).mkdir(parents=True, exist_ok=True)
         self.playwright = sync_playwright().start()
 
-        try:
-            self.context = self.playwright.chromium.launch_persistent_context(
-                user_data_dir=self.profile_dir,
-                channel="chrome",
-                headless=False,
-                viewport={"width": 1440, "height": 1000},
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--start-maximized",
-                ],
-            )
-        except Exception:
-            self.context = self.playwright.chromium.launch_persistent_context(
-                user_data_dir=self.profile_dir,
-                headless=False,
-                viewport={"width": 1440, "height": 1000},
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--start-maximized",
-                ],
-            )
+        if self.cdp_url:
+            self.browser = self.playwright.chromium.connect_over_cdp(self.cdp_url)
+            if not self.browser.contexts:
+                raise RuntimeError(f"No browser context is available at CDP URL {self.cdp_url}")
+            self.context = self.browser.contexts[0]
+        else:
+            self.owns_context = True
+            try:
+                self.context = self.playwright.chromium.launch_persistent_context(
+                    user_data_dir=self.profile_dir,
+                    channel="chrome",
+                    headless=False,
+                    viewport={"width": 1440, "height": 1000},
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--start-maximized",
+                    ],
+                )
+            except Exception:
+                self.context = self.playwright.chromium.launch_persistent_context(
+                    user_data_dir=self.profile_dir,
+                    headless=False,
+                    viewport={"width": 1440, "height": 1000},
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--start-maximized",
+                    ],
+                )
 
+        assert self.context is not None
         if self.context.pages:
             self.page = self.context.pages[0]
         else:
@@ -158,7 +189,7 @@ class BrowserFetcher:
 
     def __exit__(self, exc_type, exc, tb) -> None:
         try:
-            if self.context is not None:
+            if self.owns_context and self.context is not None:
                 self.context.close()
         finally:
             if self.playwright is not None:
@@ -343,16 +374,17 @@ def parse_vetoes(soup: BeautifulSoup, match_id: str) -> tuple[list[dict[str, Any
             map_name = safe_str(m_left.group(2))
             decider_maps.add(map_name.lower())
 
-        veto_rows.append(
-            {
-                "match_id": match_id,
-                "step_number": step_number,
-                "team_name": team_name,
-                "action": action,
-                "map_name": map_name,
-                "raw_line": line,
-            }
-        )
+        if action:
+            veto_rows.append(
+                {
+                    "match_id": match_id,
+                    "step_number": step_number,
+                    "team_name": team_name,
+                    "action": action,
+                    "map_name": map_name,
+                    "raw_line": line,
+                }
+            )
 
     return veto_rows, picked_by_map, decider_maps
 
@@ -598,13 +630,140 @@ def parse_map_stats(
     return map_summary_row, player_rows
 
 
+def validate_match_bundle(
+    meta: dict[str, Any],
+    lineups: list[dict[str, Any]],
+    maps: list[dict[str, Any]],
+) -> None:
+    missing = [
+        name
+        for name in ["match_id", "match_datetime_utc", "team1_id", "team2_id", "bo"]
+        if meta.get(name) in {None, ""}
+    ]
+    if missing:
+        raise ValueError(f"Match page is missing critical fields: {missing}")
+    if int(meta["team1_id"]) == int(meta["team2_id"]):
+        raise ValueError("Match page contains identical team identifiers")
+    if int(meta["bo"]) not in {1, 3, 5}:
+        raise ValueError(f"Unsupported match format: {meta['bo']!r}")
+
+    if lineups:
+        counts = pd.Series(
+            [safe_int(row.get("team_ordinal")) for row in lineups]
+        ).value_counts()
+        if counts.get(1, 0) != 5 or counts.get(2, 0) != 5:
+            raise ValueError(
+                f"Expected five players per lineup, got team1={counts.get(1, 0)}, "
+                f"team2={counts.get(2, 0)}"
+            )
+        player_ids = [safe_int(row.get("player_id")) for row in lineups]
+        if any(player_id is None for player_id in player_ids):
+            raise ValueError("Lineup contains a missing player identifier")
+        if len(player_ids) != len(set(player_ids)):
+            raise ValueError("A player identifier is duplicated between current lineups")
+
+    played_maps = [row for row in maps if bool(row.get("played"))]
+    if not played_maps:
+        raise ValueError("Match page does not contain a played map")
+    if any(not safe_str(row.get("map_name")) for row in played_maps):
+        raise ValueError("Played map is missing its name")
+
+
+def validate_map_stats(
+    summary: dict[str, Any],
+    players: list[dict[str, Any]],
+) -> None:
+    if summary.get("team_left_id") in {None, ""} or summary.get("team_right_id") in {None, ""}:
+        raise ValueError("Mapstats page is missing team identifiers")
+    if int(summary["team_left_id"]) == int(summary["team_right_id"]):
+        raise ValueError("Mapstats page contains identical team identifiers")
+    if len(players) < 10:
+        raise ValueError(f"Mapstats page contains only {len(players)} player rows; expected at least 10")
+    player_ids = [safe_int(row.get("player_id")) for row in players]
+    if any(player_id is None for player_id in player_ids):
+        raise ValueError("Mapstats page contains a missing player identifier")
+
+
 def save_df(rows: list[dict[str, Any]], path: Path) -> None:
     df = pd.DataFrame(rows)
-    df.to_csv(path, index=False)
+    temporary_path = path.with_suffix(f"{path.suffix}.tmp")
+    df.to_csv(temporary_path, index=False)
+    temporary_path.replace(path)
+
+
+def load_rows(path: Path) -> list[dict[str, Any]]:
+    if not path.exists() or path.stat().st_size == 0:
+        return []
+    try:
+        return pd.read_csv(path, dtype=str, keep_default_na=False).to_dict(orient="records")
+    except pd.errors.EmptyDataError:
+        return []
+
+
+def keep_completed_matches(
+    rows: list[dict[str, Any]], completed_match_ids: set[str]
+) -> list[dict[str, Any]]:
+    return [row for row in rows if safe_str(row.get("match_id")) in completed_match_ids]
+
+
+def save_checkpoint(
+    out_dir: Path,
+    matches_rows: list[dict[str, Any]],
+    lineup_rows: list[dict[str, Any]],
+    veto_rows: list[dict[str, Any]],
+    map_rows: list[dict[str, Any]],
+    player_rows: list[dict[str, Any]],
+    failure_rows: list[dict[str, Any]],
+) -> None:
+    # Child tables are replaced first. On resume, any child rows whose match was
+    # not committed to matches_enriched.csv are discarded before processing.
+    save_df(lineup_rows, out_dir / OUTPUT_FILENAMES["lineups"])
+    save_df(veto_rows, out_dir / OUTPUT_FILENAMES["vetoes"])
+    save_df(map_rows, out_dir / OUTPUT_FILENAMES["maps"])
+    save_df(player_rows, out_dir / OUTPUT_FILENAMES["players"])
+    save_df(failure_rows, out_dir / OUTPUT_FILENAMES["failures"])
+    save_df(matches_rows, out_dir / OUTPUT_FILENAMES["matches"])
+
+
+def load_checkpoint(out_dir: Path) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
+    matches_rows = load_rows(out_dir / OUTPUT_FILENAMES["matches"])
+    completed_match_ids = {
+        safe_str(row.get("match_id")) for row in matches_rows if safe_str(row.get("match_id"))
+    }
+    return (
+        matches_rows,
+        keep_completed_matches(
+            load_rows(out_dir / OUTPUT_FILENAMES["lineups"]), completed_match_ids
+        ),
+        keep_completed_matches(
+            load_rows(out_dir / OUTPUT_FILENAMES["vetoes"]), completed_match_ids
+        ),
+        keep_completed_matches(
+            load_rows(out_dir / OUTPUT_FILENAMES["maps"]), completed_match_ids
+        ),
+        keep_completed_matches(
+            load_rows(out_dir / OUTPUT_FILENAMES["players"]), completed_match_ids
+        ),
+        load_rows(out_dir / OUTPUT_FILENAMES["failures"]),
+    )
 
 
 def main() -> None:
     args = parse_args()
+
+    if args.start_offset < 0:
+        raise ValueError("--start-offset must be non-negative")
+    if args.limit_matches < 0:
+        raise ValueError("--limit-matches must be non-negative")
+    if args.checkpoint_every < 0:
+        raise ValueError("--checkpoint-every must be non-negative")
 
     input_path = Path(args.input)
     out_dir = Path(args.out_dir)
@@ -612,88 +771,143 @@ def main() -> None:
 
     raw = pd.read_csv(input_path, dtype={"match_id": str})
     raw = raw.sort_values(["match_date", "match_id"]).reset_index(drop=True)
+    raw = raw.drop_duplicates(subset=["match_id"], keep="last")
 
     if args.start_offset > 0:
         raw = raw.iloc[args.start_offset:].copy()
+
+    if args.resume:
+        (
+            matches_rows,
+            lineup_rows,
+            veto_rows,
+            map_rows,
+            player_rows,
+            failure_rows,
+        ) = load_checkpoint(out_dir)
+    else:
+        matches_rows = []
+        lineup_rows = []
+        veto_rows = []
+        map_rows = []
+        player_rows = []
+        failure_rows = []
+
+    completed_match_ids = {
+        safe_str(row.get("match_id")) for row in matches_rows if safe_str(row.get("match_id"))
+    }
+    if completed_match_ids:
+        raw = raw[~raw["match_id"].astype(str).isin(completed_match_ids)].copy()
     if args.limit_matches > 0:
         raw = raw.iloc[: args.limit_matches].copy()
 
-    matches_rows: list[dict[str, Any]] = []
-    lineup_rows: list[dict[str, Any]] = []
-    veto_rows: list[dict[str, Any]] = []
-    map_rows: list[dict[str, Any]] = []
-    player_rows: list[dict[str, Any]] = []
+    try:
+        with BrowserFetcher(args.browser_profile_dir, args.cdp_url) as browser:
+            for i, raw_row in enumerate(raw.to_dict(orient="records"), start=1):
+                match_id = safe_str(raw_row.get("match_id"))
+                match_url = safe_str(raw_row.get("source_url"))
 
-    with BrowserFetcher(args.browser_profile_dir) as browser:
-        for i, raw_row in enumerate(raw.to_dict(orient="records"), start=1):
-            match_id = safe_str(raw_row.get("match_id"))
-            match_url = safe_str(raw_row.get("source_url"))
+                print(f"[{i}/{len(raw)}] match_id={match_id}")
 
-            print(f"[{i}/{len(raw)}] match_id={match_id}")
+                try:
+                    match_html = browser.get_html(
+                        url=match_url,
+                        ready_selector=".team1-gradient .teamName",
+                        referer="https://www.hltv.org/results",
+                    )
+                    soup = BeautifulSoup(match_html, "lxml")
 
-            try:
-                match_html = browser.get_html(
-                    url=match_url,
-                    ready_selector=".team1-gradient .teamName",
-                    referer="https://www.hltv.org/results",
-                )
-                soup = BeautifulSoup(match_html, "lxml")
+                    meta = parse_match_meta(soup, raw_row)
+                    match_lineups, roster_by_team = parse_lineups(soup, match_id)
+                    match_vetoes, picked_by_map, decider_maps = parse_vetoes(soup, match_id)
+                    match_maps = parse_match_maps(soup, match_id, picked_by_map, decider_maps)
+                    match_players: list[dict[str, Any]] = []
+                    validate_match_bundle(meta, match_lineups, match_maps)
 
-                meta = parse_match_meta(soup, raw_row)
-                lineups, roster_by_team = parse_lineups(soup, match_id)
-                vetos, picked_by_map, decider_maps = parse_vetoes(soup, match_id)
-                maps = parse_match_maps(soup, match_id, picked_by_map, decider_maps)
+                    meta["team1_roster_hash"] = "-".join(map(str, sorted(roster_by_team.get(1, []))))
+                    meta["team2_roster_hash"] = "-".join(map(str, sorted(roster_by_team.get(2, []))))
 
-                meta["team1_roster_hash"] = "-".join(map(str, sorted(roster_by_team.get(1, []))))
-                meta["team2_roster_hash"] = "-".join(map(str, sorted(roster_by_team.get(2, []))))
+                    for map_row in match_maps:
+                        mapstatsid = map_row.get("mapstatsid")
+                        stats_href = safe_str(map_row.get("stats_href"))
 
-                matches_rows.append(meta)
-                lineup_rows.extend(lineups)
-                veto_rows.extend(vetos)
-                map_rows.extend(maps)
+                        if not mapstatsid:
+                            continue
 
-                for map_row in maps:
-                    mapstatsid = map_row.get("mapstatsid")
-                    stats_href = safe_str(map_row.get("stats_href"))
+                        if stats_href:
+                            stats_url = (
+                                stats_href if stats_href.startswith("http")
+                                else f"https://www.hltv.org{stats_href}"
+                            )
+                        else:
+                            stats_url = f"https://www.hltv.org/stats/matches/mapstatsid/{int(mapstatsid)}/x"
 
-                    if not mapstatsid:
-                        continue
-
-                    if stats_href:
-                        stats_url = (
-                            stats_href if stats_href.startswith("http")
-                            else f"https://www.hltv.org{stats_href}"
+                        stats_html = browser.get_html(
+                            url=stats_url,
+                            ready_selector=".stats-table.totalstats td.st-player, .totalstats td.st-player",
+                            referer=match_url,
                         )
-                    else:
-                        stats_url = f"https://www.hltv.org/stats/matches/mapstatsid/{int(mapstatsid)}/x"
 
-                    stats_html = browser.get_html(
-                        url=stats_url,
-                        ready_selector=".stats-table.totalstats td.st-player, .totalstats td.st-player",
-                        referer=match_url,
+                        stats_map_row, stats_players = parse_map_stats(
+                            html=stats_html,
+                            match_id=match_id,
+                            map_no=int(map_row["map_no"]),
+                            mapstatsid=int(mapstatsid),
+                        )
+                        validate_map_stats(stats_map_row, stats_players)
+
+                        for key, value in stats_map_row.items():
+                            if key not in {"match_id", "map_no", "mapstatsid"} and value not in {"", None}:
+                                map_row[key] = value
+
+                        match_players.extend(stats_players)
+
+                    # Commit only after the whole match, including every map page,
+                    # has been parsed successfully.
+                    matches_rows.append(meta)
+                    lineup_rows.extend(match_lineups)
+                    veto_rows.extend(match_vetoes)
+                    map_rows.extend(match_maps)
+                    player_rows.extend(match_players)
+                    failure_rows = [
+                        row for row in failure_rows if safe_str(row.get("match_id")) != match_id
+                    ]
+                except Exception as exc:
+                    print(f"[skip] match_id={match_id} -> {exc}")
+                    failure_rows = [
+                        row for row in failure_rows if safe_str(row.get("match_id")) != match_id
+                    ]
+                    failure_rows.append(
+                        {
+                            "match_id": match_id,
+                            "source_url": match_url,
+                            "failed_at_utc": datetime.now(timezone.utc).isoformat(),
+                            "error_type": type(exc).__name__,
+                            "error": safe_str(exc),
+                        }
                     )
 
-                    stats_map_row, stats_players = parse_map_stats(
-                        html=stats_html,
-                        match_id=match_id,
-                        map_no=int(map_row["map_no"]),
-                        mapstatsid=int(mapstatsid),
+                if args.checkpoint_every and i % args.checkpoint_every == 0:
+                    save_checkpoint(
+                        out_dir,
+                        matches_rows,
+                        lineup_rows,
+                        veto_rows,
+                        map_rows,
+                        player_rows,
+                        failure_rows,
                     )
-
-                    for key, value in stats_map_row.items():
-                        if key not in {"match_id", "map_no", "mapstatsid"} and value not in {"", None}:
-                            map_row[key] = value
-
-                    player_rows.extend(stats_players)
-
-            except Exception as exc:
-                print(f"[skip] match_id={match_id} -> {exc}")
-
-    save_df(matches_rows, out_dir / "matches_enriched.csv")
-    save_df(lineup_rows, out_dir / "match_lineups.csv")
-    save_df(veto_rows, out_dir / "veto_steps.csv")
-    save_df(map_rows, out_dir / "match_maps.csv")
-    save_df(player_rows, out_dir / "map_player_stats.csv")
+                    print(f"[checkpoint] attempted={i}, completed={len(matches_rows)}")
+    finally:
+        save_checkpoint(
+            out_dir,
+            matches_rows,
+            lineup_rows,
+            veto_rows,
+            map_rows,
+            player_rows,
+            failure_rows,
+        )
 
     print(f"\nSaved files to: {out_dir}")
     print(f"matches_enriched.csv: {len(matches_rows)} rows")
@@ -701,6 +915,7 @@ def main() -> None:
     print(f"veto_steps.csv: {len(veto_rows)} rows")
     print(f"match_maps.csv: {len(map_rows)} rows")
     print(f"map_player_stats.csv: {len(player_rows)} rows")
+    print(f"failed_matches.csv: {len(failure_rows)} rows")
 
 
 if __name__ == "__main__":
