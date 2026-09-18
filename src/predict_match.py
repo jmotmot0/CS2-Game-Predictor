@@ -124,7 +124,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--team2-removes", type=parse_map_list, default=[])
     parser.add_argument("--decider", type=parse_map_list, default=[])
     parser.add_argument("--clean-dir", type=Path, default=Path("data/interim/hltv_final_clean"))
-    parser.add_argument("--model-dir", type=Path, default=Path("artifacts"))
+    parser.add_argument(
+        "--model-dir", type=Path,
+        default=Path("artifacts/research_revision_2026-09-30/deployment"),
+        help="Research-selected classifier bundle; use --model-dir artifacts for the archived model.",
+    )
     parser.add_argument(
         "--rebuild-history",
         action="store_true",

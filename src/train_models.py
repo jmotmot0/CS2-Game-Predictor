@@ -1,4 +1,8 @@
-"""Train and compare CS2 outcome models on a strict chronological split."""
+"""Legacy September-3 training protocol (retained for historical reproduction).
+
+The current research protocol is ``python -m src.research_revision``. Calibration
+below belongs to the archived diagnostic, not the revised model comparison.
+"""
 
 from __future__ import annotations
 
