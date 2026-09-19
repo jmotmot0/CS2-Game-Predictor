@@ -361,6 +361,18 @@ def test_current_map_pool_uses_veto_even_when_decider_was_not_played() -> None:
     assert snapshot["avg_map_count_before"] == pytest.approx(1 / 3)
     assert snapshot["series_maps_known"] == pytest.approx(1.0)
 
+    # Counterfactual: the same pre-match veto, but the series reached map 3.
+    # Neither its occurrence nor its result may alter the current snapshot.
+    third_map = maps.iloc[[0]].copy()
+    third_map["match_id"] = 2
+    third_map["map_no"] = 3
+    third_map["match_datetime_utc"] = matches.loc[matches.match_id.eq(2), "match_datetime_utc"].iloc[0]
+    alternative = build_map_features(matches, pd.concat([maps, third_map], ignore_index=True), veto)
+    pd.testing.assert_frame_equal(
+        features.loc[features.match_id.eq(2)].reset_index(drop=True),
+        alternative.loc[alternative.match_id.eq(2)].reset_index(drop=True),
+    )
+
 
 def test_explicit_inference_map_pool_override_does_not_require_fake_results() -> None:
     matches = normalize_matches(
