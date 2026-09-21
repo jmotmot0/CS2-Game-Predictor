@@ -1,0 +1,16 @@
+{
+  "files": {
+    "comparison_metrics.csv": "9f2b2b56afdee945325d2570d295faba0e8be60f98cfedb13355cb13f00ef983",
+    "feature_schema.json": "103db23282a3e2d587dadd2e72bf7060241c13d55122aa0a4aeecfe8f847b888",
+    "integrity.json": "1e9a30d15d6816aa5fb57fc8da9e668ef2e973247975dfb3285b2e4fc9741169",
+    "linear_ranker.joblib": "de252e202cb450bad32a31a2826936c6f8208115dd27c414771243094c0a086c",
+    "linear_team_ranking.py.snapshot": "9fbb848e76029c74450c121b5211e3c997b52507566137f308b77dbacfdf04e9",
+    "model_metrics.csv": "426843ebc6339c96607d974ab1a3e77d508c68efb3000af1c37e8b8d29995774",
+    "parameters.csv": "80174e0a392190119078b4dea67e4ef4d07d4519671433730dbad9570e792e09",
+    "protocol.json": "6d1b8a32b1ab8f366a9d482cca1553ba61ac233b72af95d4c035f521340f27cb",
+    "selection.json": "eed00c304863370629f8738f64c9a85ac378d6855bb5337464bcfbf2d63ea84f",
+    "test_predictions.csv": "807613fea1dfad80e2906a08b1b81aa92b5f4af846d94902143ecb315ce6ed65",
+    "validation_c_grid.csv": "798aaaea55d97627158f59b2c4efa0be40d21d34301f71ec819892e2834e531a",
+    "validation_predictions.csv": "762a4951e2e7939eeaf918a0b309181f6ad9b60aa87164191637a73ca3015bd0"
+  }
+}

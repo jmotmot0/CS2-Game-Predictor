@@ -1,0 +1,41 @@
+{
+  "available": true,
+  "rule": "First chronological test BO3 with both HLTV ranks1-30, full player history, positive pair history and strongest-player difference opposite joint-experience difference. Outcome never used in selection.",
+  "match_id": 2388998,
+  "time": "2026-01-12 01:00:00+00:00",
+  "team1": "M80",
+  "team2": "NRG",
+  "source_url": "https://www.hltv.org/matches/2388998/m80-vs-nrg-fl0m-mythical-lan-las-vegas-2026",
+  "winner": "M80",
+  "score": "2:0",
+  "team1_features": {
+    "lineup_player_rating_mean": 1.180934001135355,
+    "lineup_player_rating_max": 1.2303316326530607,
+    "lineup_player_rating_min": 1.1190590809628,
+    "lineup_player_rating_std": 0.0376023495802284,
+    "roster_same_matches_90d": 8.0,
+    "roster_consecutive_before": 8.0,
+    "roster_pair_experience_90d": 17.6,
+    "team_rank": 24.0,
+    "winrate_last_10": 0.6,
+    "roster_overlap_prev_ratio": 1.0
+  },
+  "team2_features": {
+    "lineup_player_rating_mean": 1.1856923684472158,
+    "lineup_player_rating_max": 1.238158415841585,
+    "lineup_player_rating_min": 1.139347181008902,
+    "lineup_player_rating_std": 0.03524833943057535,
+    "roster_same_matches_90d": 8.0,
+    "roster_consecutive_before": 8.0,
+    "roster_pair_experience_90d": 14.9,
+    "team_rank": 30.0,
+    "winrate_last_10": 0.8,
+    "roster_overlap_prev_ratio": 1.0
+  },
+  "probabilities_team1": {
+    "CI": 0.4939927222435135,
+    "CTS": 0.4749411025055933,
+    "CTI": 0.481373493912596,
+    "CTIS": 0.5220143362022734
+  }
+}

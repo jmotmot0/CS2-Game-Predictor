@@ -1,0 +1,7 @@
+{
+  "frozen_files_verified_before_and_after": 52,
+  "source_manifest_sha256_before": "b73091c753b21a20d7a39996e3f52bcd8e779add06e68a9e40d16391d24b51a6",
+  "source_manifest_sha256_after": "b73091c753b21a20d7a39996e3f52bcd8e779add06e68a9e40d16391d24b51a6",
+  "frozen_files_unchanged": true,
+  "validation_and_test_ids_equal_frozen_predictions": true
+}

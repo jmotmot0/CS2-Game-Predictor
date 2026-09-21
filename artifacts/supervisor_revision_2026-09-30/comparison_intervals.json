@@ -1,0 +1,30 @@
+{
+  "validation": {
+    "accuracy_rank46_minus_classification": {
+      "estimate": -0.003135952776240546,
+      "ci95_low": -0.010361682250219334,
+      "ci95_high": 0.004379856178634914,
+      "weeks": 27
+    },
+    "loss_classifier_minus_rank46": {
+      "estimate": -2.7269688441778498e-06,
+      "ci95_low": -0.004016234919163594,
+      "ci95_high": 0.004084379919672774,
+      "weeks": 27
+    }
+  },
+  "test": {
+    "accuracy_rank46_minus_classification": {
+      "estimate": -0.004719207173194903,
+      "ci95_low": -0.012784195135315419,
+      "ci95_high": 0.0031788711523740624,
+      "weeks": 15
+    },
+    "loss_classifier_minus_rank46": {
+      "estimate": -0.0010590826739297452,
+      "ci95_low": -0.006087053563005496,
+      "ci95_high": 0.004196930474825236,
+      "weeks": 15
+    }
+  }
+}

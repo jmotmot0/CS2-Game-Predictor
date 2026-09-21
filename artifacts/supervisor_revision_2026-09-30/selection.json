@@ -1,0 +1,19 @@
+{
+  "kind": "own_team_ranking",
+  "feature_count": 46,
+  "main_seed": 42,
+  "configuration_validation": {
+    "40": {
+      "accuracy": 0.6664821988562996,
+      "pair_loss": 0.6034611776217845
+    },
+    "46": {
+      "accuracy": 0.6670356022874008,
+      "pair_loss": 0.6024958218989659
+    }
+  },
+  "rule": "The primary research method is own-team ranking with 46 inputs, fixed to measure individual-strength distribution and shared-roster experience. Rank40 is a measured control, not a post-hoc reason to remove the research factors. Winner accuracy is the primary quality metric. Classifier remains a measured comparison. Main seed42 fixed before fits, no ranking superiority presumed.",
+  "research_question_extension": 46,
+  "interpretation_configuration": 46,
+  "validation_accuracy_best_control": 46
+}

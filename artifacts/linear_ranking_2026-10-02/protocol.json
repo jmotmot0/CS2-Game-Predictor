@@ -1,0 +1,39 @@
+{
+  "kind": "linear_own_team_pairwise_ranking",
+  "score": "s(x)=w^T z(x), one common coefficient vector for both teams",
+  "probability": "sigmoid(s(A)-s(B)); no Platt calibration",
+  "loss": "log(1+exp(-(2*y-1)*(s(A)-s(B)))) with sklearn L2 regularization",
+  "estimator": "LogisticRegression(solver=lbfgs, fit_intercept=False, max_iter=2000, tol=1e-8)",
+  "preprocessing": "Median imputation then StandardScaler, both fit only on training own-team rows; no missing indicators. All-empty training inputs retained with zero imputation.",
+  "preprocessing_fit_rows": 31348,
+  "training_match_count": 15674,
+  "pair_construction": "Transform own A/B rows first, then z(A)-z(B); no mirrored augmentation",
+  "context_limitation": "Six shared context fields cancel in the linear score difference. The 46-input schema has 40 potentially active own-team inputs. No context-by-team interactions are introduced.",
+  "winner_rule": "Higher raw team score; exact ties choose lower stable team ID",
+  "training_end_exclusive": "2025-07-01",
+  "validation_end_exclusive": "2026-01-01",
+  "split_counts": {
+    "train": 15674,
+    "validation": 5421,
+    "test": 4238
+  },
+  "test_status": "Retrospective test, previously examined. Not a new independent holdout.",
+  "availability": "History sorted by match start time. End/publication timestamps not archived. Historical lineup/rank/veto reconstructed from pages.",
+  "previous_logistic_difference": "Old LR40 used difference-column median imputation with missingness indicators, scaling of mirrored difference rows, a fitted intercept and probability symmetrization. This is a newly fitted own46 linear PairLogit pipeline, not a relabelled old model. Both use logistic loss; a performance difference does not isolate the loss alone.",
+  "source_manifest_sha256": "b73091c753b21a20d7a39996e3f52bcd8e779add06e68a9e40d16391d24b51a6",
+  "input_sha256": "d61c2dd67edcd081fcd9089fb1eb8085b20f72b2e5aa15ad4656ee6452cf6a3f",
+  "library_versions": {
+    "python": "3.12.14",
+    "numpy": "2.4.3",
+    "pandas": "3.0.2",
+    "sklearn": "1.8.0",
+    "catboost": "1.2.10",
+    "matplotlib": "3.10.8"
+  },
+  "source_hashes": {
+    "src\\linear_team_ranking.py": "9fbb848e76029c74450c121b5211e3c997b52507566137f308b77dbacfdf04e9",
+    "src\\team_ranking.py": "acf4052ec4f84fcb196a8257f5e3837953b2d9c7ad113ea9c370b4cf53472d1c",
+    "src\\modeling.py": "34e7ba9aa5ddaf3a42495bd24f9c84050f424782a62bb45b731b91ef09242543",
+    "tests\\test_linear_team_ranking.py": "ccd3ebf6a15762b417ade4831fb1cc5bf4b75fe5f19d8de0337a03b0700d17b5"
+  }
+}

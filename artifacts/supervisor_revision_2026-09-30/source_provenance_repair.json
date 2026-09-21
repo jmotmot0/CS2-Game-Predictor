@@ -1,0 +1,8 @@
+{
+  "reason": "Label actual training-source identity separately from the current release-source identity. Only protocol prose differs; exact original source bytes recovered and SHA-verified.",
+  "old_manifest_sha256": "fd6664535d08ad695b77a35ad754954550e4f23be2082b5bbb529cf67bd3b3ad",
+  "old_protocol_sha256": "4bb465c277d8283351ec0b2a7349853e3ca9ed4e6c4dcc65f973df5e51f45473",
+  "training_source_snapshot": "training_supervisor_experiment.py.snapshot",
+  "training_source_sha256": "14cb91d6b263271ce31f705f95737f2dcd5ac13543da0142a5b1067a2f6844ce",
+  "numeric_files_unchanged": true
+}

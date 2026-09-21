@@ -22,13 +22,20 @@ data/edge_cdp_profile/
 
 # Models / artifacts
 models/
-artifacts/
+artifacts/*
+!artifacts/supervisor_revision_2026-09-30/
+!artifacts/linear_ranking_2026-10-02/
+!artifacts/supervisor_defense_example/
 *.pkl
 *.joblib
 *.cbm
+!artifacts/supervisor_revision_2026-09-30/*.cbm
+!artifacts/linear_ranking_2026-10-02/linear_ranker.joblib
+catboost_info/
 
 # Local deliverables and temporary build products
-documents/
+documents/*
+!documents/final/
 tmp/
 .chart-data-*/
 
