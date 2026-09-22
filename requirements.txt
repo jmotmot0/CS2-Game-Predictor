@@ -1,4 +1,4 @@
-# Data and modeling
+# Подготовка данных и обучение моделей
 numpy==2.4.3
 pandas==3.0.2
 scipy==1.18.1
@@ -8,11 +8,11 @@ catboost==1.2.10
 joblib==1.5.3
 matplotlib==3.10.8
 
-# HLTV collection and parsing
+# Сбор и разбор страниц HLTV
 beautifulsoup4==4.14.3
 curl-cffi==0.15.0
 lxml==6.0.3
 playwright==1.58.0
 
-# Tests
+# Автоматические тесты
 pytest==9.1.1

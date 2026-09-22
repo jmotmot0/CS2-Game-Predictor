@@ -155,7 +155,7 @@ def prepare(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray
     elo, opponent = elo_history(frame)
     frame["diff_elo_pre"] = elo
     frame["diff_avg_opp_elo_last_10"] = opponent
-    # Relabel focal team independently of winner / covariates. One row per match.
+    # Выбираем первую команду независимо от исхода и признаков. Одна строка на матч.
     hashed = pd.util.hash_array(frame.match_id.astype("int64").to_numpy())
     signs = np.where(hashed % 2 == 0, 1., -1.)
     y = np.where(signs == 1, frame.team1_win, 1-frame.team1_win).astype(int)
@@ -305,7 +305,7 @@ def run(output: Path) -> None:
                 coefficients.append({"hypothesis": h.key, "fold": start, "adjustment": adjustment,
                                      "coefficient": coefficient, "odds_ratio": float(np.exp(coefficient)),
                                      "unit": h.unit, "train_n": int(train.sum()), "gradient_max": model.gradient_max})
-                # Independent implementation check on one representative fit per question.
+                # Независимая проверка реализации на одном обучении для каждого вопроса.
                 if adjustment == "adjusted" and start == STARTS[0]:
                     from sklearn.linear_model import LogisticRegression
                     reference = LogisticRegression(C=1/(int(train.sum())*LAMBDA), fit_intercept=False,
@@ -317,7 +317,7 @@ def run(output: Path) -> None:
                     quality_checks.append({"hypothesis": h.key, "max_probability_error_vs_sklearn": error})
             all_part.append(part)
         part = pd.concat(all_part, ignore_index=True)
-        # These dates define bins only; no outcomes or later quantiles are used.
+        # Даты определяют только интервалы; исходы и будущие квантили не используются.
         early = mask & (frame.match_datetime_utc < pd.Timestamp(STARTS[0], tz="UTC")).to_numpy()
         if h.key in ("roster", "coverage"):
             edges = np.array([-np.inf, -1e-9, 1e-9, np.inf])

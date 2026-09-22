@@ -1,4 +1,4 @@
-"""Visible browser shared by both HLTV collectors; challenges stay manual."""
+"""Общий браузер двух сборщиков HLTV; проверку сайта проходит пользователь."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +7,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_pla
 
 
 class BrowserActionRequired(RuntimeError):
-    """Stop a batch rather than silently skipping pages behind a challenge."""
+    """Остановить сбор при проверке сайта, не пропуская заблокированные страницы."""
 
 
 class BrowserFetcher:
@@ -30,7 +30,7 @@ class BrowserFetcher:
                 if not self.browser.contexts:
                     raise RuntimeError("No browser context is available at the CDP URL")
                 self.context = self.browser.contexts[0]
-                # Never navigate or close a user's existing tab.
+                # Не переходим по адресам и не закрываем существующие вкладки пользователя.
                 self.page = self.context.new_page()
             else:
                 Path(self.profile_dir).mkdir(parents=True, exist_ok=True)
@@ -77,7 +77,7 @@ class BrowserFetcher:
         try:
             self.page.goto(url, wait_until="domcontentloaded", referer=referer, timeout=timeout_ms)
         except PlaywrightTimeoutError:
-            # A navigation timeout may still leave a usable page loaded.
+            # Даже после тайм-аута перехода страница может быть пригодна для разбора.
             pass
         try:
             self.page.wait_for_selector(ready_selector, timeout=12000)

@@ -1,11 +1,11 @@
-"""Run the frozen research ranker offline or rebuild a new pre-match snapshot.
+"""Прогноз сохранённого ранкера и пересборка признаков нового матча.
 
-With --match-id, this reproduces a stored historical pre-match feature row.
-With --team1-id/--team2-id/--match-time, it rebuilds features from completed
-historical tables and explicitly supplied current lineups, ranks and veto.
-Neither mode scrapes or retrains models.
+С --match-id используются сохранённые предматчевые признаки.
+С --team1-id/--team2-id/--match-time признаки пересчитываются по истории
+и заданным текущим составам, рейтингам и выбору карт.
+Оба режима работают без сбора страниц и повторного обучения.
 
-Example: python -m src.predict_team_ranking --match-id 2389256
+Пример: python -m src.predict_team_ranking --match-id 2389256
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ DEFAULT_CLEAN_DIR = Path("data/interim/hltv_final_clean")
 
 
 def verified_bundle(model_dir: Path, data_path: Path | None = None, *, feature_count=46):
-    """Verify the frozen files, schema and exact CatBoost feature ordering."""
+    """Проверить сохранённые файлы, схему и порядок признаков CatBoost."""
     from catboost import CatBoostRanker
 
     root = Path(model_dir).resolve()
@@ -75,7 +75,7 @@ def verified_bundle(model_dir: Path, data_path: Path | None = None, *, feature_c
 
 
 def historical_prediction(match_id: int, model_dir=DEFAULT_MODEL_DIR, data_path=None, *, feature_count=46):
-    """Predict one saved pre-match row without exposing its outcome to ranker."""
+    """Получить прогноз по предматчевой строке, не передавая модели её исход."""
     if feature_count not in (40, 46):
         raise ValueError("Supported own-team research feature counts are 40 and 46")
     if match_id <= 0:
@@ -138,11 +138,11 @@ def prepare_forecast_features(*, team1_id: int, team2_id: int, match_time,
                               team1_players=None, team2_players=None, maps=None,
                               team1_picks=None, team2_picks=None, team1_removes=None,
                               team2_removes=None, decider=None):
-    """Rebuild all own features before a pending, unlabelled match.
+    """Пересчитать признаки команд до начала матча с ещё неизвестным исходом.
 
-    Historical selection is strictly before the requested start timestamp.
-    Current lineups/ranks/veto are never inferred from later rows. Results and
-    player statistics from the pending series are absent from every table.
+    В историю входят только матчи раньше указанного времени начала.
+    Текущие составы, рейтинг и выбор карт не восстанавливаются из будущих строк.
+    Результат и статистика игроков прогнозируемой серии отсутствуют в таблицах.
     """
     from src.feature_engineering import (
         MAP_COLUMNS, PLAYER_COLUMNS, ROSTER_COLUMNS, VETO_COLUMNS,
@@ -284,7 +284,7 @@ def prepare_forecast_features(*, team1_id: int, team2_id: int, match_time,
 
 
 def forecast_prediction(*, model_dir=DEFAULT_MODEL_DIR, data_path=None, feature_count=46, **inputs):
-    """Predict a new supplied series with the frozen ranker and rebuilt history."""
+    """Прогноз новой серии сохранённым ранкером по пересобранной истории."""
     model, _, metadata = verified_bundle(Path(model_dir), data_path, feature_count=feature_count)
     row, audit = prepare_forecast_features(protocol=metadata["protocol"], **inputs)
     columns = EXTENDED_TEAM_FEATURES if feature_count == 46 else TEAM_MODEL_FEATURES
@@ -316,7 +316,7 @@ def forecast_prediction(*, model_dir=DEFAULT_MODEL_DIR, data_path=None, feature_
 
 
 def main():
-    # JSON output is UTF-8 also when Windows redirects stdout to a pipe/file.
+    # Сохраняем UTF-8 и при перенаправлении JSON в файл или канал Windows.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)

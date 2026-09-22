@@ -64,7 +64,7 @@ def test_fast_state_preserves_real_day_intervals() -> None:
         team2_players=[],
         maps=[],
     )
-    # Seven days since team 1's match minus five days since team 2's match.
+    # Семь дней после матча первой команды минус пять после матча второй.
     assert row["diff_days_since_last_match"] == pytest.approx(2.0)
     assert row["diff_activity_7d"] == pytest.approx(0.0)
     assert row["diff_elo_pre"] == pytest.approx(100.0)

@@ -417,7 +417,7 @@ def main() -> None:
             raise RuntimeError(f"Expected one prediction row, got {len(pending_row)}")
         row = pending_row.iloc[0]
 
-        # Missing live inputs mean unknown values, not two empty/equal teams.
+        # Отсутствие текущих данных означает неизвестные значения, а не равенство команд.
         if not team1_players or not team2_players:
             for name in ROSTER_COLUMNS + PLAYER_COLUMNS:
                 row[f"diff_{name}"] = np.nan

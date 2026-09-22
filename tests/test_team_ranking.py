@@ -18,7 +18,7 @@ def example_frame():
         "team2_elo_pre": [1500., 1800., 1500.],
         "team1_team_rank": [4., 8., np.nan], "team2_team_rank": [9., 2., 5.],
         "bo3": [1., 1., 0.], "team1_win": [1, 0, 1],
-        # Deliberately inconsistent legacy values prove these are never consumed.
+        # Заведомо несогласованные разности проверяют, что модель их не использует.
         "diff_elo_pre": [99999., 99999., 99999.],
     })
 

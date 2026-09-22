@@ -1,11 +1,11 @@
-"""Train a genuine linear own-team PairLogit ranker on the frozen 46 inputs.
+"""Обучение линейного парного ранкера на сохранённых 46 признаках команды.
 
-The shared scoring function is s(x) = w.T @ z(x).  Median imputation and
-standardisation are fitted to training *team objects*, before forming paired
-differences.  LogisticRegression without an intercept minimises the pairwise
-logistic loss on z(A)-z(B); its class predictions are never used as team scores.
-The six shared match-context inputs cancel in the linear score difference.
-This module does not modify the frozen CatBoost models or their inference CLI.
+Общая функция оценки: s(x) = w.T @ z(x). Медианы для заполнения пропусков
+и масштабирование рассчитываются по тренировочным строкам команд до
+построения разностей. LogisticRegression без свободного члена минимизирует
+логистическую потерю пары на z(A)-z(B); метки классов не служат оценкой силы.
+Шесть общих контекстных входов сокращаются в разности линейных оценок.
+Модуль не меняет сохранённые модели CatBoost и их команду прогноза.
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def binary_target(target, size: int) -> np.ndarray:
 
 
 def pair_log_loss(target, margin) -> np.ndarray:
-    """Unclipped per-match PairLogit = BCE(sigmoid(margin)); overflow safe."""
+    """PairLogit на матч без обрезки вероятностей, с защитой от переполнения."""
     values = np.asarray(margin, dtype=float)
     if values.ndim != 1 or not np.isfinite(values).all():
         raise ValueError("One finite score difference per match is required")
@@ -55,7 +55,7 @@ def pair_log_loss(target, margin) -> np.ndarray:
 
 
 class LinearTeamRanker:
-    """A single linear score for either own-team feature vector, not a classifier label."""
+    """Общая линейная оценка признаков любой команды, а не метка класса."""
 
     def __init__(self, feature_names=None, *, C=1.0, max_iter=2000, tol=1e-8):
         self.feature_names = list(EXTENDED_TEAM_FEATURES if feature_names is None else feature_names)
@@ -106,7 +106,7 @@ class LinearTeamRanker:
         return self.scaler_.transform(self.imputer_.transform(ordered))
 
     def predict(self, rows: pd.DataFrame) -> np.ndarray:
-        """Return raw scores for own-team objects, never 0/1 class labels."""
+        """Вернуть числовые оценки команд, а не метки классов 0/1."""
         transformed = self.transform_team_rows(rows)
         return self.estimator_.decision_function(transformed)
 
@@ -150,7 +150,7 @@ def verify_frozen(directory: Path) -> tuple[str, dict]:
 
 
 def select_regularization(frame, target, masks, *, feature_names=None, grid=DEFAULT_C_GRID):
-    """Fit on train only; choose C by validation PairLogit, never test quality."""
+    """Обучить на train и выбрать C по PairLogit валидации, не используя тест."""
     candidates = tuple(float(value) for value in grid)
     if not candidates or len(set(candidates)) != len(candidates):
         raise ValueError("C grid must be nonempty and unique")
@@ -168,7 +168,7 @@ def select_regularization(frame, target, masks, *, feature_names=None, grid=DEFA
 
 
 def run_experiment(frozen_dir=DEFAULT_FROZEN_DIR, output=DEFAULT_OUTPUT, *, grid=DEFAULT_C_GRID):
-    """Write an independent reproducible experiment; never overwrite completed outputs."""
+    """Сохранить отдельный эксперимент, не перезаписывая готовые результаты."""
     import joblib
 
     frozen_dir = Path(frozen_dir).resolve()
@@ -299,8 +299,8 @@ def main():
 
 
 if __name__ == "__main__":
-    # Import the canonical module so joblib records an importable class path,
-    # not __main__.LinearTeamRanker when invoked via python -m.
+    # Импорт по имени модуля позволяет joblib записать доступный путь класса,
+    # а не __main__.LinearTeamRanker при запуске через python -m.
     from src.linear_team_ranking import main as canonical_main
 
     canonical_main()

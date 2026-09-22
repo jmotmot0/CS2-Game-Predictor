@@ -110,8 +110,8 @@ def test_verify_cli_reports_success_without_predicting(frozen_bundle, monkeypatc
 @pytest.fixture
 def tiny_clean_history(tmp_path):
     matches, lineups, maps, stats, veto = [], [], [], [], []
-    # The sixth completed series is later than our forecast and is deliberately
-    # extreme: changing it must not affect the pending snapshot.
+    # Шестая серия позже прогноза; её показатели намеренно завышены.
+    # Их изменение не должно влиять на предматчевые признаки.
     for match_id, day in enumerate([1, 2, 3, 4, 5, 7], start=1):
         matches.append({
             "match_id": match_id, "match_date": f"2026-01-{day:02}",

@@ -1,4 +1,4 @@
-name: project-checks
+name: Проверка проекта
 
 on:
   push:
@@ -14,9 +14,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install dependencies
+      - name: Установка зависимостей
         run: python -m pip install -r requirements.txt
-      - name: Compile Python sources
+      - name: Проверка синтаксиса Python
         run: python -m compileall -q src tests
-      - name: Run deterministic unit tests
+      - name: Запуск автоматических тестов
         run: python -m pytest -q

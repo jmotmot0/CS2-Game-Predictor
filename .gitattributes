@@ -1,12 +1,8 @@
-# Frozen experiment manifests verify exact bytes across Windows and Linux.
-# Do not normalize line endings in these published research bundles.
+# Контрольные суммы экспериментов должны совпадать в Windows и Linux.
+# В сохранённых комплектах не меняем окончания строк.
 artifacts/supervisor_revision_2026-09-30/** -text
 artifacts/linear_ranking_2026-10-02/** -text
-artifacts/supervisor_defense_example/** -text
 
-# Office/PDF deliverables are binary files.
-*.docx binary
-*.pptx binary
-*.pdf binary
+# Обученные модели хранятся как двоичные файлы.
 *.cbm binary
 *.joblib binary

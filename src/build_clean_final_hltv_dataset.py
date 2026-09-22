@@ -73,7 +73,7 @@ def normalize_raw(raw: pd.DataFrame, cutoff_date: str) -> pd.DataFrame:
     raw = raw.dropna(subset=["match_id", "match_date", "team1", "team2"])
     raw = raw[raw["match_date"] >= pd.Timestamp(cutoff_date)].copy()
 
-    # dedup: prefer latest row if duplicates exist
+    # При дубликатах оставляем последнюю строку.
     dedup_subset = ["match_id"]
     raw = raw.sort_values(["match_date", "match_id"]).drop_duplicates(
         subset=dedup_subset, keep="last"
@@ -136,8 +136,8 @@ def normalize_matches_enriched(df: pd.DataFrame, cutoff_date: str) -> pd.DataFra
     df = df.dropna(subset=["match_id", "match_date", "team1", "team2"])
     df = df[df["match_date"] >= pd.Timestamp(cutoff_date)].copy()
 
-    # Dedup enriched matches by match_id.
-    # Prefer rows with non-null datetime, ranks, ids.
+    # Удаляем дубликаты по match_id, отдавая приоритет строкам
+    # с заполненными временем, рейтингами и идентификаторами.
     score_cols = ["match_datetime_utc", "team1_id", "team2_id", "team1_rank", "team2_rank"]
     for col in score_cols:
         if col not in df.columns:
@@ -168,7 +168,7 @@ def normalize_and_filter_child_tables(
     map_player_stats: pd.DataFrame,
     valid_match_ids: set[int],
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    # lineups
+    # Составы команд.
     if "match_id" in match_lineups.columns:
         match_lineups["match_id"] = pd.to_numeric(match_lineups["match_id"], errors="coerce").astype("Int64")
         for col in ["team_ordinal", "team_id", "player_id"]:
@@ -180,7 +180,7 @@ def normalize_and_filter_child_tables(
             ["match_id", "team_id", "player_id"],
         )
 
-    # veto
+    # Порядок выбора и удаления карт.
     if "match_id" in veto_steps.columns:
         veto_steps["match_id"] = pd.to_numeric(veto_steps["match_id"], errors="coerce").astype("Int64")
         if "step_number" in veto_steps.columns:
@@ -191,7 +191,7 @@ def normalize_and_filter_child_tables(
             ["match_id", "step_number", "team_name", "action", "map_name"],
         )
 
-    # maps
+    # Карты матча.
     if "match_id" in match_maps.columns:
         match_maps["match_id"] = pd.to_numeric(match_maps["match_id"], errors="coerce").astype("Int64")
         numeric_cols = [
@@ -207,7 +207,7 @@ def normalize_and_filter_child_tables(
             ["match_id", "map_no", "map_name"],
         )
 
-    # player stats
+    # Статистика игроков.
     if "match_id" in map_player_stats.columns:
         map_player_stats["match_id"] = pd.to_numeric(map_player_stats["match_id"], errors="coerce").astype("Int64")
         numeric_cols = [
@@ -242,12 +242,12 @@ def merge_raw_and_enriched(raw: pd.DataFrame, enriched_matches: pd.DataFrame) ->
         suffixes=("", "_raw"),
     )
 
-    # preserve enriched match_date primarily
+    # В первую очередь сохраняем дату из подробной страницы матча.
     if "match_date_raw" in matches_final.columns:
         matches_final["match_date"] = matches_final["match_date"].fillna(matches_final["match_date_raw"])
         matches_final = matches_final.drop(columns=["match_date_raw"])
 
-    # canonical target
+    # Единое определение таргета.
     matches_final["team1_score"] = pd.to_numeric(matches_final.get("team1_score"), errors="coerce")
     matches_final["team2_score"] = pd.to_numeric(matches_final.get("team2_score"), errors="coerce")
 
@@ -264,7 +264,7 @@ def merge_raw_and_enriched(raw: pd.DataFrame, enriched_matches: pd.DataFrame) ->
     matches_final.loc[winner_norm == team1_norm, "team1_win"] = 1
     matches_final.loc[winner_norm == team2_norm, "team1_win"] = 0
 
-    # fallback from scores
+    # Если победитель не указан, восстанавливаем его по счёту.
     score_mask = (
         matches_final["team1_win"].isna()
         & matches_final["team1_score"].notna()
@@ -332,7 +332,7 @@ def main() -> None:
 
     matches_enriched = normalize_matches_enriched(matches_enriched, cutoff_date=args.cutoff_date)
 
-    # Keep only enriched matches that exist in cleaned raw too.
+    # Оставляем подробные матчи, которые есть и в очищенном исходном списке.
     valid_raw_ids = set(raw_clean["match_id"].dropna().astype(int).tolist())
     matches_enriched = matches_enriched[matches_enriched["match_id"].isin(valid_raw_ids)].copy()
 

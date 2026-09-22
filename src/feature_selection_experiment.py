@@ -100,7 +100,7 @@ def rank_features(model, x: pd.DataFrame, y: np.ndarray, times: pd.Series,
     pvc = dict(zip(MODEL_FEATURES, model.get_feature_importance()))
     baseline = float(point_losses(y, symmetrized_probability(model, x)).mean())
     rng = np.random.default_rng(seed)
-    # Common permutation draws reduce Monte Carlo noise in comparisons.
+    # Одинаковые перестановки уменьшают случайный шум при сравнении вариантов.
     permutations = [monthly_permutation(times, rng) for _ in range(repeats)]
     rows = []
     for group in bundles:
@@ -156,7 +156,7 @@ def paired_weekly_interval(differences: np.ndarray, times: pd.Series,
 
 
 def summarize(predictions: pd.DataFrame) -> list[dict]:
-    # Average per-match losses over seeds, NOT probabilities (no seed ensemble).
+    # Усредняем потери по запускам, а не вероятности: это не ансамбль моделей.
     matches = predictions.groupby(["method", "budget", "match_id", "match_datetime_utc"], as_index=False).agg(loss=("loss", "mean"), correct=("correct", "mean"))
     baseline = matches[(matches.method == "PVC") & (matches.budget == 40)][["match_id", "loss"]].rename(columns={"loss": "full_loss"})
     rows = []
@@ -215,7 +215,7 @@ def run(output: Path, repeats: int = 20) -> None:
 
     def run_fold(start: str, phase: str, choices: list[tuple[str, int]]) -> None:
         masks = split_masks(frame, start)
-        # No evaluation target enters tuning, ranking or early stopping.
+        # Таргет оцениваемого периода не участвует в настройке и ранней остановке.
         k, _, _, _, k_scores = tune_elo(frame, masks["early_stop"])
         x = frame[MODEL_FEATURES].copy()
         recalculated = elo_features(frame, k)
@@ -253,7 +253,7 @@ def run(output: Path, repeats: int = 20) -> None:
         run_fold(start, "development", choices)
     development = summarize(pd.concat(predictions, ignore_index=True))
     winner = development[0]
-    # Frozen before even evaluating the historical 2026 diagnostic.
+    # Фиксируем выбор до диагностической оценки исторического периода 2026 года.
     dump(output / "selection_decision.json", {"frozen_utc": datetime.now(timezone.utc).isoformat(), "winner": winner, "development": development})
     selected = (winner["method"], winner["budget"])
     diagnostic_choices = list(dict.fromkeys([("PVC", 40), ("PFI_LogLoss", 40), selected]))

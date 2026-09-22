@@ -1,4 +1,4 @@
-"""Shared modeling utilities for training, evaluation and inference."""
+"""Общие функции обучения моделей, оценки качества и получения прогноза."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ TRAIN_END = "2025-07-01"
 VALIDATION_END = "2026-01-01"
 MODEL_SCHEMA_VERSION = 3
 
-# Explicit allow-list. Nothing outside this list can reach a fitted model.
+# Явный список разрешённых признаков: остальные поля не передаются модели.
 MODEL_FEATURES = [
     "bo1",
     "bo3",

@@ -88,7 +88,7 @@ def test_same_timestamp_is_one_snapshot_batch_not_sequential_updates() -> None:
     assert result.iloc[2].team1_roster_same_matches_90d == 2
     assert result.iloc[2].team1_roster_pair_experience_90d == 2
     assert result.iloc[2].team1_roster_consecutive_before == 2
-    # Input order cannot cause a same-time match to acquire the other's history.
+    # Порядок строк не должен передавать историю между матчами с одинаковым временем.
     shuffled = build_research_team_features(frame.iloc[::-1], source.iloc[::-1], stats.iloc[::-1])
     pd.testing.assert_frame_equal(result, shuffled)
 

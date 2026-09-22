@@ -626,8 +626,8 @@ def save_checkpoint(
     player_rows: list[dict[str, Any]],
     failure_rows: list[dict[str, Any]],
 ) -> None:
-    # Child tables are replaced first. On resume, any child rows whose match was
-    # not committed to matches_enriched.csv are discarded before processing.
+    # Сначала заменяем дочерние таблицы. При продолжении убираем строки
+    # тех матчей, которые ещё не сохранены в matches_enriched.csv.
     save_df(lineup_rows, out_dir / OUTPUT_FILENAMES["lineups"])
     save_df(veto_rows, out_dir / OUTPUT_FILENAMES["vetoes"])
     save_df(map_rows, out_dir / OUTPUT_FILENAMES["maps"])
@@ -781,8 +781,8 @@ def main() -> None:
 
                         match_players.extend(stats_players)
 
-                    # Commit only after the whole match, including every map page,
-                    # has been parsed successfully.
+                    # Сохраняем матч только после успешного разбора
+                    # всех связанных страниц, включая каждую карту.
                     matches_rows.append(meta)
                     lineup_rows.extend(match_lineups)
                     veto_rows.extend(match_vetoes)
@@ -792,7 +792,7 @@ def main() -> None:
                         row for row in failure_rows if safe_str(row.get("match_id")) != match_id
                     ]
                 except BrowserActionRequired:
-                    # A challenge affects the batch, not just this one match.
+                    # Проверка сайта останавливает всю загрузку, а не один матч.
                     raise
                 except Exception as exc:
                     print(f"[skip] match_id={match_id} -> {exc}")

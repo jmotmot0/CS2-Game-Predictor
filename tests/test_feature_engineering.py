@@ -361,8 +361,8 @@ def test_current_map_pool_uses_veto_even_when_decider_was_not_played() -> None:
     assert snapshot["avg_map_count_before"] == pytest.approx(1 / 3)
     assert snapshot["series_maps_known"] == pytest.approx(1.0)
 
-    # Counterfactual: the same pre-match veto, but the series reached map 3.
-    # Neither its occurrence nor its result may alter the current snapshot.
+    # Тот же предматчевый выбор, но серия дошла до третьей карты.
+    # Ни её проведение, ни результат не должны менять признаки текущего матча.
     third_map = maps.iloc[[0]].copy()
     third_map["match_id"] = 2
     third_map["map_no"] = 3

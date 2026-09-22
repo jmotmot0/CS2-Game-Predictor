@@ -1,8 +1,8 @@
-"""Real pairwise CatBoost training representation, with one pair per series.
+"""Парное обучение CatBoost: одна обучающая пара на серию.
 
-Each object is a team in its current match, described by own-minus-opponent
-differences and common pre-match context. This preserves exactly the information
-available to the classifier; it does NOT create a context-free global ranking.
+Объект — команда в текущем матче, описанная разностями с соперником
+и общим предматчевым контекстом. Сохраняется та же информация, что у
+классификатора; независимый от соперника глобальный рейтинг не строится.
 """
 from __future__ import annotations
 import numpy as np
@@ -40,5 +40,5 @@ def ranker_probability(model, features: pd.DataFrame) -> np.ndarray:
 
 
 def pair_losses(margins, target):
-    """Stable PairLogit per match: softplus(-(2y-1)*(s_A-s_B))."""
+    """Устойчивый расчёт PairLogit на матч: softplus(-(2y-1)*(s_A-s_B))."""
     return np.logaddexp(0.0, -(2 * np.asarray(target) - 1) * np.asarray(margins))

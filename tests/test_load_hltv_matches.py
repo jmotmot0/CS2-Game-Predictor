@@ -70,7 +70,7 @@ def collect(tmp_path, **kwargs):
 
 def test_parse_results_keeps_regular_list_and_filters_invalid_matches():
     html = results_html(total=2).replace("<span>2</span>", "<span>1</span>", 1)
-    # A featured duplicate must not affect counts or output.
+    # Дубликат в избранных результатах не должен влиять на счётчик и выгрузку.
     html = '<div class="results-all">featured duplicate</div>' + html
     rows, newest, oldest = loader.extract_rows_from_page(html, DAY, DAY)
     assert [row["match_id"] for row in rows] == ["2"]

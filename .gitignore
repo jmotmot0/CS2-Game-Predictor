@@ -1,4 +1,4 @@
-# Python
+# Окружение Python и кэш
 .venv/
 __pycache__/
 *.pyc
@@ -6,26 +6,25 @@ __pycache__/
 .coverage
 htmlcov/
 
-# IDE
+# Настройки редакторов
 .idea/
 .vscode/
 
-# Data
+# Локальные выгрузки и промежуточные данные
 data/raw/
 data/interim/
 data/processed/
 
-# Browser / scraping profiles
+# Браузерные профили сборщика
 data/browser_profile/
 data/chrome_cdp_profile/
 data/edge_cdp_profile/
 
-# Models / artifacts
+# Локальные модели и результаты; ниже разрешены два проверяемых комплекта
 models/
 artifacts/*
 !artifacts/supervisor_revision_2026-09-30/
 !artifacts/linear_ranking_2026-10-02/
-!artifacts/supervisor_defense_example/
 *.pkl
 *.joblib
 *.cbm
@@ -33,16 +32,23 @@ artifacts/*
 !artifacts/linear_ranking_2026-10-02/linear_ranker.joblib
 catboost_info/
 
-# Local deliverables and temporary build products
-documents/*
-!documents/final/
+# Материалы защиты и служебные скрипты остаются только локально
+documents/
+plan.md
+src/report_feature_selection.py
+src/report_hltv_research.py
+scripts/*
+!scripts/start_hltv_browser.ps1
+!scripts/verify_team_ranking_inference.py
+# Временные файлы открытых документов Office
+~$*
 tmp/
 .chart-data-*/
 
-# Local environment and credentials
+# Локальные переменные окружения и учётные данные
 .env
 .env.*
 !.env.example
 
-# Logs
+# Журналы
 *.log

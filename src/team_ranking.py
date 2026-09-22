@@ -1,9 +1,9 @@
-"""Pairwise ranking of two own-team vectors, grouped by pre-match series.
+"""Парное ранжирование команд по их собственным предматчевым признакам.
 
-Unlike ``src.pairwise``, objects here are *not* mirrored difference vectors.
-Each participant contributes its own historical measurements exactly once.
-Scores remain contextual: H2H depends on the opponent, and historical map
-measurements depend on the common map pool announced before this series.
+В отличие от ``src.pairwise``, здесь используются не зеркальные разности,
+а отдельный вектор исторических показателей каждой команды.
+Оценка учитывает контекст: личные встречи зависят от соперника, а показатели
+по картам — от общего набора карт, объявленного до начала серии.
 """
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ EXTENDED_TEAM_FEATURE_GROUPS["cohesion"]["features"].update(EXTRA_JOINT_EXPERIEN
 
 
 def team_columns_for(groups, *, extended: bool = False) -> list[str]:
-    """Return the canonical own-team feature order for research families."""
+    """Вернуть признаки выбранных групп в порядке, принятом для модели."""
     definitions = EXTENDED_TEAM_FEATURE_GROUPS if extended else TEAM_FEATURE_GROUPS
     order = EXTENDED_TEAM_FEATURES if extended else TEAM_MODEL_FEATURES
     chosen = {name for group in groups for name in definitions[group]["features"]}
@@ -64,13 +64,13 @@ def team_columns_for(groups, *, extended: bool = False) -> list[str]:
 
 
 def team_rows(frame: pd.DataFrame, feature_names=None) -> pd.DataFrame:
-    """Interleave A/B objects from a wide frame without using ``diff_*``.
+    """Преобразовать строку матча в две строки команд, не используя ``diff_*``.
 
-    Common context is copied into both objects; own features are read only from
-    ``team1_*`` and ``team2_*`` columns. A lower HLTV rank denotes greater
-    strength, hence the explicit ``rank_score = -own_rank`` transformation.
-    Missing values remain missing. No labels, scores or team identifiers enter
-    the feature matrix.
+    Общий контекст копируется в обе строки, собственные показатели берутся
+    из ``team1_*`` и ``team2_*``. Меньшее место HLTV означает более сильную
+    команду, поэтому используется ``rank_score = -own_rank``.
+    Пропуски сохраняются. Таргет, итоговый счёт и ID команд не входят
+    в матрицу признаков.
     """
     names = list(TEAM_MODEL_FEATURES if feature_names is None else feature_names)
     if not names or len(names) != len(set(names)):
@@ -104,7 +104,7 @@ def team_rows(frame: pd.DataFrame, feature_names=None) -> pd.DataFrame:
 
 
 def team_ranking_pool(frame: pd.DataFrame, target, feature_names=None):
-    """Create one two-object query and one winner-to-loser pair per series."""
+    """Создать группу из двух команд и пару «победитель — проигравший» на серию."""
     from catboost import Pool
 
     y = np.asarray(target)
@@ -121,7 +121,7 @@ def team_ranking_pool(frame: pd.DataFrame, target, feature_names=None):
 
 
 def team_ranking_scores(model, frame: pd.DataFrame, feature_names=None) -> np.ndarray:
-    """Return ``[score_A, score_B]`` for each match; no averaging is needed."""
+    """Вернуть ``[score_A, score_B]`` для каждого матча без усреднения."""
     scores = np.asarray(model.predict(team_rows(frame, feature_names)), dtype=float)
     if scores.size != 2 * len(frame) or not np.isfinite(scores).all():
         raise ValueError("The ranker must return one finite score per team object")
@@ -129,18 +129,18 @@ def team_ranking_scores(model, frame: pd.DataFrame, feature_names=None) -> np.nd
 
 
 def team_ranking_probability(model, frame: pd.DataFrame, feature_names=None) -> np.ndarray:
-    """PairLogit probability of A: sigmoid(score_A − score_B), uncalibrated."""
+    """Вероятность победы A: sigmoid(score_A − score_B), без калибровки."""
     from scipy.special import expit
     scores = team_ranking_scores(model, frame, feature_names)
     return expit(scores[:, 0] - scores[:, 1])
 
 
 def team_ranking_decision(model, frame: pd.DataFrame, feature_names=None):
-    """Choose the higher score, returning outcomes and the exact-tie mask.
+    """Выбрать большую оценку и отдельно отметить случаи точного равенства.
 
-    Ties use the lower stable team ID, not the arbitrary order of the columns.
-    This convention is separate from learned scores and must be reported in
-    quality evaluation. IDs are required only when exact score ties occur.
+    При равенстве выбирается меньший постоянный ID команды, а не первая
+    колонка. Это отдельное правило выбора, не часть обученной оценки.
+    ID нужны только при равенстве; такие случаи учитываются при оценке качества.
     """
     scores = team_ranking_scores(model, frame, feature_names)
     ties = scores[:, 0] == scores[:, 1]
@@ -156,12 +156,12 @@ def team_ranking_decision(model, frame: pd.DataFrame, feature_names=None):
 
 
 def swap_team_columns(frame: pd.DataFrame) -> pd.DataFrame:
-    """Exchange every paired ``team1_*``/``team2_*`` column in a wide frame.
+    """Поменять местами парные столбцы ``team1_*`` и ``team2_*``.
 
-    This is an input-order check, not training augmentation. Other columns are
-    preserved; the existing binary outcome is complemented when present.
-    ``diff_*`` columns are also negated for consistency, although team_rows
-    deliberately never consumes them.
+    Это проверка независимости от порядка команд, не дополнение обучающей
+    выборки. Таргет меняется на противоположный, если он есть в таблице.
+    Разности ``diff_*`` меняют знак для согласованности, хотя team_rows
+    не использует их. Остальные столбцы сохраняются.
     """
     swapped = frame.copy()
     for column in frame.columns:

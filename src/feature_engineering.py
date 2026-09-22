@@ -1,9 +1,8 @@
-"""Leakage-safe feature engineering for professional CS2 matches.
+"""Предматчевые признаки профессиональных матчей CS2 с защитой от утечки.
 
-The central rule in this module is simple: all snapshots for timestamp ``t``
-are calculated before any result observed at ``t`` updates historical state.
-This rule is applied consistently to team form, Elo, head-to-head history,
-rosters, player statistics, map pool and veto history.
+Все признаки на время ``t`` вычисляются до обновления истории результатами
+матчей с этим временем. Правило применяется к форме, Elo, личным встречам,
+составам, статистике игроков, набору карт и истории их выбора.
 """
 
 from __future__ import annotations
@@ -143,9 +142,9 @@ def normalize_matches(matches: pd.DataFrame, *, include_pending: bool = False) -
     missing_time = match_time.isna() & match_date.notna()
     match_time.loc[missing_time] = match_date.loc[missing_time]
 
-    # A page occasionally contains a stale timestamp that disagrees with the
-    # canonical result date. The exact time is then unknown, so noon UTC keeps
-    # the match within the correct day without pretending midnight precision.
+    # Иногда время страницы расходится с датой в списке результатов.
+    # Точное время тогда неизвестно: полдень UTC сохраняет правильный день
+    # и не выдаёт условную полночь за фактическое начало матча.
     date_gap = (match_time.dt.normalize() - match_date).abs()
     repaired = match_date.notna() & match_time.notna() & date_gap.gt(pd.Timedelta(days=2))
     match_time.loc[repaired] = match_date.loc[repaired] + pd.Timedelta(hours=12)
@@ -226,7 +225,7 @@ def normalize_maps(maps: pd.DataFrame, matches: pd.DataFrame) -> pd.DataFrame:
     if "played" in df.columns:
         played = df["played"].astype("string").str.lower().isin(["true", "1", "yes"])
         played |= df["played"].eq(1)
-        # Missing marker means that the old scraper did not expose this flag.
+        # Пропуск означает, что прежний сборщик не сохранял этот флаг.
         df = df[played | df["played"].isna()].copy()
     if "is_default_forfeit_map" in df.columns:
         default_forfeit = (
@@ -612,9 +611,9 @@ def build_map_features(
                     rounds = float(won) + float(lost)
                     return float(won) / rounds if rounds > 0 else np.nan
 
-                # On a given side, one team's won rounds are the opponent's lost
-                # rounds. Overtime is absent from the scraped half split and is
-                # therefore deliberately excluded from these denominators.
+                # Победы команды за данную сторону — поражения соперника.
+                # Дополнительные раунды отсутствуют в разбивке по половинам,
+                # поэтому они не включаются в эти знаменатели.
                 ct1 = side_rate(map_row.team1_ct_rounds, map_row.team2_t_rounds)
                 t1 = side_rate(map_row.team1_t_rounds, map_row.team2_ct_rounds)
                 ct2 = side_rate(map_row.team2_ct_rounds, map_row.team1_t_rounds)
@@ -638,8 +637,8 @@ def build_veto_features(matches: pd.DataFrame, veto: pd.DataFrame) -> pd.DataFra
         current_maps = {
             "picked": own.loc[own["action"].eq("picked"), "map_name"].dropna().astype(str),
             "removed": own.loc[own["action"].eq("removed"), "map_name"].dropna().astype(str),
-            # The decider belongs to the series rather than one team. It is a
-            # pre-match-known map for both participants.
+            # Решающая карта относится к серии, а не к отдельной команде.
+            # До начала матча она известна обоим участникам.
             "left_over": current.loc[
                 current["action"].eq("left_over"), "map_name"
             ].dropna().astype(str),
@@ -716,7 +715,7 @@ def add_difference_features(frame: pd.DataFrame) -> pd.DataFrame:
         if column1 in df.columns and column2 in df.columns:
             df[f"diff_{name}"] = df[column1] - df[column2]
     if {"team1_team_rank", "team2_team_rank"}.issubset(df.columns):
-        # A lower numerical rank means a stronger team.
+        # Меньшее место в рейтинге означает более сильную команду.
         df["diff_rank"] = df["team2_team_rank"] - df["team1_team_rank"]
     return df
 

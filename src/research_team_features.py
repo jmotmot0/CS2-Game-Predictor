@@ -1,21 +1,20 @@
-"""Additional historical player-distribution and joint-lineup measurements.
+"""Исторические показатели распределения силы игроков и совместной игры.
 
-The input chronology is the same as ``feature_engineering.normalize_matches``.
-Every match at time t is snapshotted before any observations from time t are
-applied. As elsewhere in this project, this uses recorded match start times,
-not independently archived publication or completion times.
+Хронология совпадает с ``feature_engineering.normalize_matches``.
+Признаки на время t вычисляются до добавления наблюдений с тем же временем.
+Используются записанные времена начала, а не отдельно сохранённые времена
+окончания матчей или публикации результатов.
 
-Player Rating means have exactly the existing player's-history semantics:
-one player-statistics row counts as one past map; the mean uses its finite
-Rating values, and a player is eligible after ``min_history_maps`` maps.
-Unlike the existing partially covered lineup mean, max/min/std require all
-five current players to be eligible and to have a finite historical mean.
+Одна строка статистики игрока считается одной прошлой картой. Средний Rating
+вычисляется по известным значениям; игроку нужно не менее ``min_history_maps``
+карт истории. В отличие от среднего по доступной части состава, max/min/std
+требуют достаточной истории и известного среднего Rating всех пяти игроков.
 
-The 90-day window is [t - 90 days, t). Exact-five and consecutive counts are
-team-specific. Pair experience follows player identities globally, including
-previous joint series under another team ID. One series contributes once to
-each observed pair, regardless of the number of maps. These measurements
-describe observed joint experience, not communication or a causal team effect.
+Окно истории — [t - 90 дней, t). Серии точной пятёрки и последовательность
+неизменного состава считаются внутри команды. Опыт пар отслеживается по ID
+игроков, включая совместные серии под другим названием команды. Каждая серия
+прибавляет единицу каждой наблюдаемой паре независимо от числа карт.
+Это измерение совместной истории, а не качества общения или причинного эффекта.
 """
 
 from __future__ import annotations
@@ -54,18 +53,18 @@ def build_research_team_features(
     player_stats: pd.DataFrame,
     min_history_maps: int = 5,
 ) -> pd.DataFrame:
-    """Return match_id and six additional columns for each team perspective.
+    """Вернуть match_id и шесть дополнительных показателей для каждой команды.
 
-    Inputs may be clean tables or the historical feature dataset for matches.
-    Pending matches can be snapshotted but do not update past observations.
-    Incomplete current lineups produce NaN for all six measurements. Missing
-    historical Rating produces NaN for its three distribution measurements,
-    not for independently observable joint-lineup counts.
+    Входы — очищенные таблицы или историческая таблица признаков матчей.
+    Для будущего матча признаки считаются, но история им не обновляется.
+    Неполный текущий состав даёт NaN для всех шести показателей. Пропуски
+    исторического Rating дают NaN для трёх характеристик его распределения,
+    но не для отдельно наблюдаемой совместной истории.
 
-    Consecutive counts break at an observed incomplete roster. If one team
-    appears with different rosters at one identical timestamp, the order is
-    unknowable: the subsequent streak is NaN until a known roster change.
-    Same-timestamp identical rosters count all observed series after the batch.
+    Неполный состав прерывает подсчёт последовательности. Если у команды
+    разные составы в одно время, порядок неизвестен: длина последовательности
+    остаётся NaN до известной смены состава. При одинаковых составах с одним
+    временем все серии учитываются после обработки этой группы матчей.
     """
     if (
         not isinstance(min_history_maps, (int, np.integer))
@@ -97,7 +96,7 @@ def build_research_team_features(
         for match_id, group in stats.groupby("match_id", sort=False)
     }
 
-    # [number of observed maps, finite rating sum, number of finite ratings].
+    # [число карт, сумма известных Rating, число известных Rating].
     player_history: dict[int, list[float]] = defaultdict(lambda: [0.0, 0.0, 0.0])
     team_history: dict[int, deque[tuple[pd.Timestamp, tuple[int, ...] | None]]] = defaultdict(deque)
     pair_history: dict[tuple[int, int], deque[pd.Timestamp]] = defaultdict(deque)
@@ -147,7 +146,7 @@ def build_research_team_features(
         return values
 
     for timestamp, batch in chronology.groupby("match_datetime_utc", sort=False):
-        # Stage 1: every row sees precisely the same pre-batch history.
+        # Шаг 1: все матчи с одним временем используют одну предшествующую историю.
         for match in batch.itertuples(index=False):
             match_id = int(match.match_id)
             row: dict[str, int | float] = {"match_id": match_id}
@@ -156,7 +155,7 @@ def build_research_team_features(
                 row.update({f"team{ordinal}_{name}": value for name, value in values.items()})
             rows.append(row)
 
-        # Stage 2: completed series become observations for strictly later times.
+        # Шаг 2: результаты серий доступны только для более поздних времён.
         updates: dict[int, list[tuple[int, ...] | None]] = defaultdict(list)
         for match in batch.itertuples(index=False):
             outcome = match.team1_win
@@ -170,7 +169,7 @@ def build_research_team_features(
                 roster = _full_roster(players)
                 team_history[team_id].append((timestamp, roster))
                 updates[team_id].append(roster)
-                # Observed pairs in a partial old roster remain observable pairs.
+                # Известные пары учитываются и при неполном старом составе.
                 observed_pairs.update(combinations(players, 2))
             for pair in observed_pairs:
                 pair_history[pair].append(timestamp)
@@ -195,7 +194,7 @@ def build_research_team_features(
                 ambiguous_last.discard(team_id)
                 continue
             if team_id in ambiguous_last:
-                # At least these series are known, but their predecessor is not.
+                # Эти серии известны, но предшествующая им серия неизвестна.
                 streak[team_id] = np.nan
                 ambiguous_last.discard(team_id)
             elif last_roster.get(team_id) == roster:

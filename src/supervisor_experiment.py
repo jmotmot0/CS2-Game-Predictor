@@ -35,7 +35,7 @@ def data():
     f = load_feature_dataset(Path('data/processed/features_dataset.csv'))
     masks = dict(zip(['train', 'validation', 'test'], chronological_masks(f)))
     k, elo, a, b, _ = tune_elo(f, masks['validation'])
-    # Own-team Elo and classifier difference must refer to the same tuned history.
+    # Собственный Elo команды и разность классификатора используют одну историю.
     f['team1_elo_pre'], f['team2_elo_pre'], f['diff_elo_pre'] = a, b, a-b
     return f, masks, f.team1_win.to_numpy(int), k, elo
 
@@ -60,7 +60,7 @@ def train_ranker(frame, y, masks, columns, seed, key, out):
     for part in ['validation', 'test']:
         predictions[part], scores[part] = prediction(model, frame.loc[masks[part]], columns)
         metrics[part] = metric_row(y[masks[part]], predictions[part])
-        # Winner accuracy from the raw score ordering, no fitted threshold.
+        # Accuracy считается по порядку оценок, без подбора порога.
         decision, ties = team_ranking_decision(model, frame.loc[masks[part]], columns)
         metrics[part]['accuracy'] = float(np.mean(decision == y[masks[part]]))
         metrics[part]['exact_score_ties'] = int(ties.sum())
@@ -147,8 +147,8 @@ def extended(out):
     f=f.merge(extra,on='match_id',how='left',validate='one_to_one')
     f.to_csv(out/'extended_features.csv',index=False)
     expanded=list(TEAM_MODEL_FEATURES)+EXTRA_I+EXTRA_S
-    # Absolute representation keeps level information that differences discard.
-    # This comparison evaluates a full modelling pipeline, not the loss alone.
+    # Собственные признаки сохраняют уровни показателей, которые теряются в разностях.
+    # Сравнивается весь подход, а не только функция потерь.
     tabs={p:pd.read_csv(out/f'{p}_predictions.csv') for p in ['validation','test']}
     for seed in SEEDS:
         key=f'ranking_46_s{seed}'
@@ -164,11 +164,10 @@ def extended(out):
         'research_question_extension':46,
         'interpretation_configuration':46,
         'validation_accuracy_best_control':min([40,46],key=lambda n:(-means[n]['accuracy'],means[n]['pair_loss']))}
-    # The 46-column ranker is the planned scientific model because its feature
-    # families operationalize the supervisor's question. The 40-column control
-    # checks the price/benefit of measuring the new hypotheses, not a reason to
-    # pretend those hypotheses were measured by an aggregate-only model.
-    # Report BOTH configuration-selection result and the research fit explicitly.
+    # Набор из 46 входов включает показатели исследуемых индивидуальных различий
+    # и совместного опыта. Вариант с 40 входами проверяет пользу их добавления.
+    # Он не заменяет исследовательскую модель, в которой эти показатели измерены.
+    # Сохраняем и результат сравнения конфигураций, и полную модель.
     write_json(out/'selection.json',selection)
     comp=[]
     for p,tab in tabs.items():
@@ -179,7 +178,7 @@ def extended(out):
             comp.append({'split':p,'model':col,**mm,
                          'n':len(tab),'exact_ties':int(tab[col].eq(.5).sum())})
     pd.DataFrame(comp).to_csv(out/'comparison_metrics.csv',index=False)
-    # Fixed research representation includes the hypotheses to be investigated.
+    # Зафиксированный набор признаков включает проверяемые гипотезы.
     families={'I':group_columns(['individual'])+EXTRA_I,
               'T':group_columns(['team']), 'S':group_columns(['cohesion'])+EXTRA_S,
               'C':group_columns(['controls'])}
@@ -244,8 +243,8 @@ def extended(out):
 
 
 def example(frame, tab, out):
-    # Rule fixed independently of outcome: first well-observed professional BO3
-    # with opposing signs of strongest player and average pair experience.
+    # Правило не зависит от исхода: первый BO3 с полной историей, где преимущества
+    # по сильнейшему игроку и среднему совместному опыту направлены противоположно.
     valid=frame.bo.eq(3)
     for side in ['team1','team2']:
         valid &= frame[f'{side}_lineup_history_coverage'].eq(1)

@@ -11,7 +11,7 @@ if ($StartDate.Date -gt $EndDate.Date) {
 }
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-# A dedicated project profile only. Never reuse/copy the personal Chrome profile.
+# Используется отдельный профиль проекта, а не личный профиль Chrome.
 $browserProfile = Join-Path $projectRoot 'data\chrome_cdp_profile\hltv_refresh'
 $chromeCandidates = @(
     (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
@@ -38,7 +38,7 @@ $chromeArguments = @(
     $resultsUrl
 )
 
-# Visible by design: the user, not an automation script, handles site challenges.
+# Окно видно пользователю: проверку сайта он проходит самостоятельно.
 Start-Process -FilePath $chromePath -ArgumentList $chromeArguments -WindowStyle Normal | Out-Null
 $cdpUrl = "http://127.0.0.1:$Port"
 $ready = $false

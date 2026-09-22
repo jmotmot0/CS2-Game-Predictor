@@ -226,7 +226,7 @@ def fetch_html(
             if status == 200:
                 html = response.text
 
-                # Sometimes Cloudflare challenge can still come back as HTML.
+                # Вместо результатов иногда возвращается HTML проверки Cloudflare.
                 if (
                     "challenge-error-title" in html
                     or "Enable JavaScript and cookies to continue" in html
@@ -248,13 +248,13 @@ def fetch_html(
 
 
 def get_regular_results_container(soup: BeautifulSoup):
-    # Current HLTV results page: first page may contain big-results duplicates.
-    # The last .results-all block is the regular authoritative list.
+    # На первой странице HLTV избранные результаты могут дублировать основной список.
+    # Последний блок .results-all содержит основной список матчей.
     containers = soup.select(".results-all")
     if containers:
         return containers[-1]
 
-    # Fallback for older markup variants.
+    # Поддержка прежних вариантов разметки.
     legacy = soup.select("div.allres")
     if legacy:
         return legacy[-1]
@@ -279,7 +279,7 @@ def extract_rows_from_page(
 
         entries = sublist.select(".result-con")
         if not entries:
-            # Fallback for older markup where parser iterated anchors.
+            # Поддержка старой разметки с последовательным разбором ссылок.
             entries = sublist.select("a.a-reset")
 
         for entry in entries:
@@ -465,7 +465,7 @@ def build_matches_dataframe(
     if state["complete"]:
         print("[resume] Using the already completed snapshot; no network refresh.")
         return rows_to_dataframe(state["rows"])
-    # Even a failure on page 1 leaves an explicit, resumable run description.
+    # Даже сбой первой страницы оставляет состояние для продолжения сбора.
     if checkpoint:
         save_progress(checkpoint, state)
 
@@ -487,13 +487,13 @@ def build_matches_dataframe(
                 return fetch_html(session, url, sleep_min, sleep_max, retries, timeout)
 
         def fetch_page(offset: int) -> tuple[str, list[str], int]:
-            # Freeze the date window; do not paginate a constantly moving all-time list.
+            # Фиксируем диапазон дат, чтобы список не менялся при обходе страниц.
             query = urlencode({"startDate": str(start_date), "endDate": str(end_date), "offset": offset})
             html = get_page(f"{RESULTS_URL}?{query}")
             ids, total = results_page_info(html, offset)
             return html, ids, total
 
-        # Check the head and the resume boundary before trusting saved offsets.
+        # Проверяем начало списка и границу продолжения перед использованием смещений.
         if state["next_offset"]:
             checks = {0: state["first_page_ids"], state["next_offset"] - 100: state["last_page_ids"]}
             for offset, expected_ids in checks.items():

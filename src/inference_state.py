@@ -100,9 +100,9 @@ def build_inference_state(clean_dir: Path, *, elo_k: float = 48.0) -> dict[str, 
             probability1 = 1.0 / (1.0 + 10.0 ** ((rating2 - rating1) / 400.0))
             deltas[team1_id] += elo_k * (outcome1 - probability1)
             deltas[team2_id] += elo_k * (outcome2 - (1 - probability1))
-            # Preserve the datetime array's native unit (Pandas 3 commonly uses
-            # microseconds); interpreting its integer value as nanoseconds would
-            # shrink all intervals by a factor of 1000.
+            # Сохраняем единицу времени массива: pandas 3 часто использует
+            # микросекунды. Их ошибочная трактовка как наносекунд уменьшила бы
+            # все интервалы в 1000 раз.
             timestamp = pd.Timestamp(timestamp_values[index])
 
             for team, result, opponent_rating in [

@@ -11,8 +11,8 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Joblib cannot query physical cores through WMIC on some modern Windows systems.
-# An explicit conservative cap avoids that optional probe and keeps runs stable.
+# В некоторых версиях Windows joblib не может получить число ядер через WMIC.
+# Явное ограничение числа потоков исключает этот запрос и стабилизирует запуск.
 os.environ.setdefault("LOKY_MAX_CPU_COUNT", str(min(os.cpu_count() or 1, 8)))
 
 import numpy as np
@@ -217,7 +217,7 @@ def main() -> None:
     validation_predictions["CatBoost"] = symmetrized_probability(catboost, x_validation)
     predictions["CatBoost"] = symmetrized_probability(catboost, x_test)
 
-    # Calibration parameters are fitted only on the validation period.
+    # Параметры калибровки оцениваются только на валидационном периоде.
     epsilon = 1e-6
     validation_logit = np.log(
         np.clip(validation_predictions["CatBoost"], epsilon, 1 - epsilon)

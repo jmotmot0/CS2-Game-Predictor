@@ -1,7 +1,7 @@
-"""Canonical, disjoint feature families for the player-versus-team study.
+"""Непересекающиеся группы признаков для сравнения игроков и команд.
 
-These are observational predictive groups, not causal factors. Cohesion is
-represented only by roster continuity; it is not a measurement of communication.
+Это группы наблюдаемых показателей, а не причинные факторы. В базовой схеме
+состав описывается только его сохранностью, а не измерением качества общения.
 """
 from src.modeling import MODEL_FEATURES
 

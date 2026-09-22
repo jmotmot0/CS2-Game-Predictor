@@ -1,4 +1,4 @@
-"""Compare a fresh unlabelled forecast snapshot to the frozen research row."""
+"""Сверка пересобранных предматчевых признаков с сохранённой строкой матча."""
 from __future__ import annotations
 
 import argparse

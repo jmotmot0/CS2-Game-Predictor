@@ -133,11 +133,11 @@ def compare(output):
             for part in prediction:
                 prediction_frames[part][key] = prediction[part]
                 prediction_frames[part].to_csv(output/f'{part}_predictions.csv', index=False)
-    # Elo is the interpretable outcome-history baseline. Chance is the sanity baseline.
+    # Elo — бейзлайн по истории результатов; случайный прогноз — контроль здравого смысла.
     for part, out in prediction_frames.items():
         out['chance'] = .5
         out['elo'] = elo[masks[part]]
-    # Refit the linear comparison on the same historical split, with C chosen on validation.
+    # Обучаем линейный вариант на том же разбиении, выбирая C по валидации.
     from sklearn.impute import SimpleImputer
     from sklearn.preprocessing import StandardScaler
     from sklearn.pipeline import make_pipeline
@@ -230,7 +230,7 @@ def groups(output):
             np.testing.assert_allclose(phi_i+phi_t, losses['C']-losses['CTIS'], atol=1e-15)
     pd.DataFrame(contributions).to_csv(output/'group_contributions.csv', index=False)
     pd.DataFrame(allocations).to_csv(output/'group_shapley.csv', index=False)
-    # A conditional sensitivity cohort: individual quality has no missing values.
+    # Проверка на подвыборке без пропусков индивидуальных показателей.
     test = frame.loc[masks['test']].reset_index(drop=True)
     complete = test[columns_for(['individual'])].notna().all(axis=1)
     for side in ['team1', 'team2']:
@@ -253,7 +253,7 @@ def groups(output):
     importance = model.get_feature_importance(pool, type='LossFunctionChange', thread_count=8)
     pd.DataFrame({'feature':MODEL_FEATURES,'validation_LossFunctionChange':importance}).sort_values(
         'validation_LossFunctionChange',ascending=False).to_csv(output/'native_importance_secondary.csv',index=False)
-    # Save raw features and predictions for transparent selection of a real example.
+    # Сохраняем признаки и прогнозы для воспроизводимого выбора примера.
     example_columns = [c for c in frame if c in ['match_id','match_datetime_utc','team1_name','team2_name','team1_id','team2_id','team1_win']
                        or c.startswith(('team1_lineup_', 'team2_lineup_', 'team1_roster_', 'team2_roster_'))]
     candidates = frame.loc[masks['test'], example_columns].reset_index(drop=True)
